@@ -1,0 +1,31 @@
+{
+  "zionnationalpark.org": {
+    "title": "ZionNationalPark.org",
+    "siteUrl": "https://zionnationalpark.org",
+    "allowedOrigins": [
+      "https://zionnationalpark.org",
+      "https://www.zionnationalpark.org",
+      "https://zionnationalpark-org.onrender.com"
+    ],
+    "minBid": 2500,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
+  },
+  "yellowstonenationalpark.net": {
+    "title": "YellowstoneNationalPark.net",
+    "siteUrl": "https://yellowstonenationalpark.net",
+    "allowedOrigins": [
+      "https://yellowstonenationalpark.net",
+      "https://www.yellowstonenationalpark.net"
+    ],
+    "minBid": 2000,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
+  }
+}

@@ -1,0 +1,32 @@
+
+/* ---------- auction page ---------- */
+.auction-panel { background: var(--night); color: #fff; padding: clamp(1.3rem, 3vw, 2rem); border-left: 6px solid var(--gold); margin-bottom: 1.6rem; }
+.a-status { display: inline-block; font-family: var(--head); font-weight: 700; font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; padding: .25rem .6rem; background: rgba(255,255,255,.14); color: #fff; }
+.a-status.is-running { background: var(--gold); color: var(--night); }
+.a-status.is-open { background: var(--river); color: #fff; }
+.a-label { font-family: var(--head); font-size: .95rem; color: #c9d1dc; margin: 1.1rem 0 0; }
+.a-amount { font-family: var(--head); font-weight: 800; font-size: clamp(2.4rem, 7vw, 3.6rem); line-height: 1.1; margin: 0; color: #fff; }
+.a-clock-label { font-family: var(--head); font-size: .95rem; color: #c9d1dc; margin: 1.1rem 0 0; }
+.a-clock { font-family: var(--head); font-weight: 700; font-size: clamp(1.3rem, 4vw, 1.8rem); margin: 0; font-variant-numeric: tabular-nums; }
+.a-meta { font-size: .95rem; color: #c9d1dc; margin: .9rem 0 0; line-height: 1.55; }
+.a-history-wrap { margin-top: 1.3rem; border-top: 1px solid rgba(255,255,255,.18); padding-top: 1rem; }
+.a-history-wrap h3 { font-size: 1rem; color: #fff; margin: 0 0 .5rem; }
+.a-history { list-style: none; margin: 0; padding: 0; font-family: var(--head); font-size: .95rem; }
+.a-history li { display: flex; justify-content: space-between; gap: 1rem; padding: .3rem 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+.a-history li span:first-child { font-weight: 700; }
+.a-history li span:last-child { color: #c9d1dc; text-align: right; }
+.a-banner { padding: .9rem 1.1rem; margin-bottom: 1.2rem; font-family: var(--head); font-weight: 600; border-left: 6px solid; }
+.a-banner.is-ok { background: #e3f2e6; border-color: #2e7d4a; color: #174a2b; }
+.a-banner.is-warn { background: #fdf0d8; border-color: #b9770e; color: #6b4306; }
+.form-status.is-ok { color: #1f6b3d; }
+.a-amount-field { position: relative; }
+.a-amount-field span { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); font-family: var(--head); font-weight: 700; }
+.a-amount-field input { padding-left: 1.8rem !important; }
+.a-closed { background: #fff; border: 1px solid var(--line); padding: 1.2rem 1.4rem; font-family: var(--head); font-weight: 600; }
+.a-list { margin: 0 0 1.6rem; padding-left: 1.2rem; }
+.a-list li { margin-bottom: .45rem; }
+.a-side h2 { font-size: 1.35rem; }
+.ask-form { background: #fff; border: 1px solid var(--line); padding: 1.2rem 1.4rem; margin-top: 1.6rem; }
+.ask-form .btn { width: 100%; }
+.ask-form h3 { margin-top: 0; }
+[hidden] { display: none !important; }

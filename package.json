@@ -1,0 +1,18 @@
+{
+  "name": "auction-service",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "nodemailer": "^10.1.7"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  }
+}
