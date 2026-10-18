@@ -232,7 +232,7 @@ app.post("/api/auctions/:id/bids", bidLimiter, async (req, res) => {
   await sendMail(email, "Confirm your bid on " + c.title,
     "Hello " + name + ",\n\nYou entered a bid of " + money(amount) + " on " + c.title + ".\n\n" +
     "Your bid does not count until you confirm it. Click this link within 24 hours:\n" + link + "\n\n" +
-    "By confirming, you agree that your bid is binding. If you win, you are expected to complete payment through Escrow.com within 7 days of the auction closing.\n\n" +
+    "By confirming, you agree that your bid is binding on you. If you win, you are expected to open and fund an Escrow.com transaction within 7 days of the auction closing. Until escrow is funded, the owner may remove any bid or cancel the auction; once escrow is funded, the sale is final under the Escrow.com terms.\n\n" +
     "If you did not place this bid, ignore this email and nothing will happen.\n");
   res.json({ ok: true, message: "Check your email and click the confirmation link. Your bid counts once you confirm it." });
 });
@@ -331,6 +331,8 @@ app.post("/admin/api/logout", (_req, res) => {
   res.json({ ok: true });
 });
 
+const SALE_LOCKED = ["escrow_funded", "paid", "transferred"];
+function saleLocked(id) { return SALE_LOCKED.includes(getState(id).winner_status); }
 function locked(id) {
   const s = getState(id);
   return !!s.started_at || db.prepare("SELECT COUNT(*) n FROM bids WHERE auction_id=? AND status='verified'").get(id).n > 0;
@@ -344,7 +346,7 @@ function adminView(id) {
   bids.filter((b) => b.status === "verified").forEach((b) => { const k = b.email; if (!best.has(k) || best.get(k).amount < b.amount) best.set(k, b); });
   const ranking = [...best.values()].sort((a, b) => b.amount - a.amount);
   const log = db.prepare("SELECT at,action,detail FROM audit WHERE auction_id=? ORDER BY id DESC LIMIT 60").all(id);
-  return { id, config: c, state: p, locked: locked(id), cancelled: !!s.cancelled, cancelReason: s.cancel_reason, finalized: !!s.finalized, winnerStatus: s.winner_status, notes: s.notes, bids, ranking, audit: log };
+  return { id, config: c, state: p, locked: locked(id), cancelled: !!s.cancelled, saleLocked: SALE_LOCKED.includes(s.winner_status), cancelReason: s.cancel_reason, finalized: !!s.finalized, winnerStatus: s.winner_status, notes: s.notes, bids, ranking, audit: log };
 }
 function summaryRow(id) {
   const p = publicState(id), s = getState(id);
@@ -454,11 +456,12 @@ app.delete("/admin/api/auctions/:id", adminAuth, (req, res) => {
 app.put("/admin/api/auctions/:id/workflow", adminAuth, (req, res) => {
   const id = req.params.id;
   if (!cfg(id)) return res.status(404).json({ error: "Unknown auction." });
-  const allowed = ["awaiting_escrow", "escrow_open", "paid", "transferred", "defaulted"];
+  const allowed = ["awaiting_escrow", "escrow_open", "escrow_funded", "paid", "transferred", "defaulted"];
   const b = req.body || {};
   const s = getState(id);
   const ws = "winnerStatus" in b ? String(b.winnerStatus) : s.winner_status;
   if (!allowed.includes(ws)) return res.status(400).json({ error: "Unknown status." });
+  if (SALE_LOCKED.includes(s.winner_status) && !SALE_LOCKED.includes(ws)) return res.status(409).json({ error: "Escrow was marked as funded, so this sale is locked and the status cannot be moved back." });
   const notes = "notes" in b ? String(b.notes || "").slice(0, 4000) : s.notes;
   db.prepare("UPDATE state SET winner_status=?, notes=? WHERE auction_id=?").run(ws, notes, id);
   if (ws !== s.winner_status) audit(id, "winner status", s.winner_status + " -> " + ws);
@@ -470,6 +473,7 @@ app.post("/admin/api/bids/:bid/void", adminAuth, (req, res) => {
   const row = db.prepare("SELECT * FROM bids WHERE id=?").get(Number(req.params.bid));
   if (!row) return res.status(404).json({ error: "Unknown bid." });
   if (row.status === "voided" || row.status === "rejected") return res.status(409).json({ error: "That bid is already out of the auction." });
+  if (saleLocked(row.auction_id)) return res.status(409).json({ error: "Escrow is funded for this property, so bids can no longer be removed." });
   const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
   if (!reason) return res.status(400).json({ error: "Enter a short reason for your records." });
   const c = cfg(row.auction_id);
@@ -496,6 +500,7 @@ app.post("/admin/api/auctions/:id/cancel", adminAuth, (req, res) => {
   if (!c) return res.status(404).json({ error: "Unknown auction." });
   const s = getState(id);
   if (s.cancelled) return res.status(409).json({ error: "This auction is already cancelled." });
+  if (saleLocked(id)) return res.status(409).json({ error: "Escrow is funded for this property, so the sale can no longer be cancelled." });
   const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
   if (!reason) return res.status(400).json({ error: "Enter a short reason for your records." });
   db.prepare("UPDATE state SET cancelled=1, cancel_reason=? WHERE auction_id=?").run(reason, id);

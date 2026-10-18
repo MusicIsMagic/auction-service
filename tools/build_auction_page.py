@@ -91,7 +91,7 @@ main = f"""<main id="main">
 <div class="field"><label for="bid-phone">Phone</label><input type="tel" id="bid-phone" name="phone" autocomplete="tel" required></div>
 </div>
 <div class="field"><label for="bid-amount">Your bid (US dollars)</label><div class="a-amount-field"><span>$</span><input type="text" inputmode="numeric" id="bid-amount" name="amount" autocomplete="off" required></div></div>
-<div class="field"><label class="check"><input type="checkbox" name="terms" id="bid-terms"><span>I have read the auction terms. I understand that a confirmed bid is binding, and that the winner pays through Escrow.com within 7 days of the auction closing.</span></label></div>
+<div class="field"><label class="check"><input type="checkbox" name="terms" id="bid-terms"><span>I have read the auction terms. I understand that a confirmed bid is binding on me, that the winner opens and funds an Escrow.com transaction within 7 days of the auction closing, and that the owner may remove a bid or cancel the auction until escrow is funded.</span></label></div>
 <button class="btn" type="submit">Submit bid</button>
 <div id="bid-status" class="form-status" role="status"></div>
 </form>
@@ -120,7 +120,8 @@ main = f"""<main id="main">
 </ol>
 
 <h2>Terms</h2>
-<p class="fine" style="margin-top:0">A confirmed bid is a binding offer. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The owner may remove a bid, for example if a bidder cannot be reached or cannot complete payment, or may cancel the auction at any time before escrow is funded. Removed bids are counted on this page, and a removed bidder owes nothing. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.</p>
+<p class="fine" style="margin-top:0">A confirmed bid is binding on the bidder. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.</p>
+<p class="fine"><strong>Right to remove bids and cancel.</strong> Until a bidder has funded an Escrow.com transaction for this property, the owner may, at the owner's sole discretion and at any time, remove any bid or cancel the auction, for any reason, including if a bidder cannot be reached, does not respond, or does not open or fund escrow. A removed bid or a cancelled auction releases the bidder, who then owes nothing. Once a buyer has funded an Escrow.com transaction for this property, the owner will not cancel the sale or remove that bid, and the sale will be completed under the Escrow.com terms. Removed bids are counted on this page.</p>
 
 <form id="ask-form" class="ask-form" novalidate>
 <h3>Ask a question</h3>
