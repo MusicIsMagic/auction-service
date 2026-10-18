@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS labels (
 
 try { db.exec("ALTER TABLE state ADD COLUMN winner_status TEXT NOT NULL DEFAULT 'awaiting_escrow'"); } catch (e) { /* already there */ }
 try { db.exec("ALTER TABLE state ADD COLUMN notes TEXT NOT NULL DEFAULT ''"); } catch (e) { /* already there */ }
+try { db.exec("ALTER TABLE state ADD COLUMN cancelled INTEGER NOT NULL DEFAULT 0"); } catch (e) { /* already there */ }
+try { db.exec("ALTER TABLE state ADD COLUMN cancel_reason TEXT"); } catch (e) { /* already there */ }
 
 /* auctions live in the database so the dashboard can edit them; auctions.json only seeds new ones */
 const AUCTIONS = {};
@@ -127,6 +129,7 @@ function highBid(id) {
   return db.prepare("SELECT * FROM bids WHERE auction_id=? AND status='verified' ORDER BY amount DESC, verified_at ASC, id ASC LIMIT 1").get(id);
 }
 function status(c, s, now) {
+  if (s.cancelled) return "cancelled";
   if (c.opensAt && now < Date.parse(c.opensAt)) return "not_started";
   if (s.started_at) return now >= s.ends_at ? "ended" : "running";
   if (c.bidsOpenUntil && now >= Date.parse(c.bidsOpenUntil)) return "ended";
@@ -156,6 +159,7 @@ function publicState(id, now = Date.now()) {
     startedAt: s.started_at, endsAt: s.ends_at,
     durationDays: c.durationDays, softCloseHours: c.softCloseHours,
     opensAt: c.opensAt, bidsOpenUntil: c.bidsOpenUntil,
+    removedBids: db.prepare("SELECT COUNT(*) n FROM bids WHERE auction_id=? AND status='voided' AND verified_at IS NOT NULL").get(id).n,
     history, serverTime: now
   };
 }
@@ -214,6 +218,7 @@ app.post("/api/auctions/:id/bids", bidLimiter, async (req, res) => {
   const s = getState(id);
   const st = status(c, s, now);
   if (st === "not_started") return res.status(409).json({ error: "Bidding has not opened yet." });
+  if (st === "cancelled") return res.status(409).json({ error: "This auction has been cancelled." });
   if (st === "ended") return res.status(409).json({ error: "Bidding has ended." });
   const required = nextMin(c, highBid(id));
   if (amount < required) return res.status(409).json({ error: "Your bid must be at least " + money(required) + ".", nextMinBid: required });
@@ -255,7 +260,7 @@ app.get("/api/verify", async (req, res) => {
   const tx = db.transaction(() => {
     const s = getState(row.auction_id);
     const st = status(c, s, now);
-    if (st === "ended" || st === "not_started") { db.prepare("UPDATE bids SET status='rejected', reject_reason='closed' WHERE id=?").run(row.id); return "closed"; }
+    if (st === "ended" || st === "not_started" || st === "cancelled") { db.prepare("UPDATE bids SET status='rejected', reject_reason='closed' WHERE id=?").run(row.id); return "closed"; }
     const high = highBid(row.auction_id);
     if (row.amount < nextMin(c, high)) { db.prepare("UPDATE bids SET status='rejected', reject_reason='outbid' WHERE id=?").run(row.id); return "outbid"; }
     prevHigh = high;
@@ -339,7 +344,7 @@ function adminView(id) {
   bids.filter((b) => b.status === "verified").forEach((b) => { const k = b.email; if (!best.has(k) || best.get(k).amount < b.amount) best.set(k, b); });
   const ranking = [...best.values()].sort((a, b) => b.amount - a.amount);
   const log = db.prepare("SELECT at,action,detail FROM audit WHERE auction_id=? ORDER BY id DESC LIMIT 60").all(id);
-  return { id, config: c, state: p, locked: locked(id), finalized: !!s.finalized, winnerStatus: s.winner_status, notes: s.notes, bids, ranking, audit: log };
+  return { id, config: c, state: p, locked: locked(id), cancelled: !!s.cancelled, cancelReason: s.cancel_reason, finalized: !!s.finalized, winnerStatus: s.winner_status, notes: s.notes, bids, ranking, audit: log };
 }
 function summaryRow(id) {
   const p = publicState(id), s = getState(id);
@@ -461,6 +466,61 @@ app.put("/admin/api/auctions/:id/workflow", adminAuth, (req, res) => {
   res.json(adminView(id));
 });
 
+app.post("/admin/api/bids/:bid/void", adminAuth, (req, res) => {
+  const row = db.prepare("SELECT * FROM bids WHERE id=?").get(Number(req.params.bid));
+  if (!row) return res.status(404).json({ error: "Unknown bid." });
+  if (row.status === "voided" || row.status === "rejected") return res.status(409).json({ error: "That bid is already out of the auction." });
+  const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
+  if (!reason) return res.status(400).json({ error: "Enter a short reason for your records." });
+  const c = cfg(row.auction_id);
+  let reset = false;
+  db.transaction(() => {
+    db.prepare("UPDATE bids SET status='voided', reject_reason=? WHERE id=?").run(reason, row.id);
+    const s = getState(row.auction_id);
+    const running = s.started_at && Date.now() < s.ends_at && !s.cancelled;
+    if (running && !highBid(row.auction_id)) {
+      // nobody left: the auction goes back to waiting for a first bid, and the clock resets
+      db.prepare("UPDATE state SET started_at=NULL, ends_at=NULL WHERE auction_id=?").run(row.auction_id);
+      reset = true;
+    }
+  })();
+  audit(row.auction_id, "bid removed", money(row.amount) + " by " + row.email + ". Reason: " + reason + (reset ? " (no bids left, clock reset)" : ""));
+  sendMail(row.email, "Your bid on " + c.title + " was removed",
+    "Hello " + row.name + ",\n\nThe owner has removed your bid of " + money(row.amount) + " on " + c.title + ", so it no longer counts in the auction. You owe nothing.\n\n" +
+    "If you are still interested, you are welcome to bid again while the auction is open: " + c.siteUrl + "/auction.html\n");
+  res.json(adminView(row.auction_id));
+});
+
+app.post("/admin/api/auctions/:id/cancel", adminAuth, (req, res) => {
+  const id = req.params.id, c = cfg(id);
+  if (!c) return res.status(404).json({ error: "Unknown auction." });
+  const s = getState(id);
+  if (s.cancelled) return res.status(409).json({ error: "This auction is already cancelled." });
+  const reason = String((req.body || {}).reason || "").trim().slice(0, 300);
+  if (!reason) return res.status(400).json({ error: "Enter a short reason for your records." });
+  db.prepare("UPDATE state SET cancelled=1, cancel_reason=? WHERE auction_id=?").run(reason, id);
+  audit(id, "auction cancelled", reason);
+  const seen = new Map();
+  verifiedBids(id).forEach((b) => seen.set(b.email, b.name));
+  seen.forEach((name, email) => sendMail(email, "Auction cancelled: " + c.title,
+    "Hello " + name + ",\n\nThe owner has cancelled the auction for " + c.title + ". No sale will be made and you owe nothing. Thank you for your interest.\n"));
+  res.json(adminView(id));
+});
+
+app.post("/admin/api/auctions/:id/reopen", adminAuth, (req, res) => {
+  const id = req.params.id;
+  if (!cfg(id)) return res.status(404).json({ error: "Unknown auction." });
+  const s = getState(id);
+  if (!s.cancelled) return res.status(409).json({ error: "Only a cancelled auction can be reopened." });
+  db.transaction(() => {
+    db.prepare("UPDATE bids SET status='voided', reject_reason='previous auction was cancelled' WHERE auction_id=? AND status IN ('verified','pending')").run(id);
+    db.prepare("DELETE FROM labels WHERE auction_id=?").run(id);
+    db.prepare("UPDATE state SET started_at=NULL, ends_at=NULL, finalized=0, cancelled=0, cancel_reason=NULL, winner_status='awaiting_escrow' WHERE auction_id=?").run(id);
+  })();
+  audit(id, "auction reopened", "fresh start, old bids cleared");
+  res.json(adminView(id));
+});
+
 app.get("/admin/api/auctions/:id/bids.csv", adminAuth, (req, res) => {
   const id = req.params.id;
   if (!cfg(id)) return res.status(404).send("Unknown auction.");
@@ -487,7 +547,7 @@ async function finalizeEnded() {
   const now = Date.now();
   for (const id of Object.keys(AUCTIONS)) {
     const c = AUCTIONS[id], s = getState(id);
-    if (s.finalized || !s.started_at || now < s.ends_at) continue;
+    if (s.cancelled || s.finalized || !s.started_at || now < s.ends_at) continue;
     db.prepare("UPDATE state SET finalized=1, winner_status='awaiting_escrow' WHERE auction_id=?").run(id);
     audit(id, "auction ended", "");
     const win = highBid(id);

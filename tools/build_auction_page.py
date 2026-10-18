@@ -73,6 +73,7 @@ main = f"""<main id="main">
 <div class="a-history-wrap" id="a-history-wrap" hidden>
 <h3>Confirmed bids</h3>
 <ul class="a-history" id="a-history"></ul>
+<p class="a-meta" id="a-removed" hidden></p>
 </div>
 </div>
 
@@ -119,7 +120,7 @@ main = f"""<main id="main">
 </ol>
 
 <h2>Terms</h2>
-<p class="fine" style="margin-top:0">A confirmed bid is a binding offer. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.</p>
+<p class="fine" style="margin-top:0">A confirmed bid is a binding offer. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The owner may remove a bid, for example if a bidder cannot be reached or cannot complete payment, or may cancel the auction at any time before escrow is funded. Removed bids are counted on this page, and a removed bidder owes nothing. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.</p>
 
 <form id="ask-form" class="ask-form" novalidate>
 <h3>Ask a question</h3>

@@ -19,7 +19,7 @@ main{max-width:1100px;margin:0 auto;padding:1rem}
 .card h2{margin:0 0 .6rem;font-size:1.1rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
 .pill{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15rem .5rem;border-radius:99px;background:var(--line);color:var(--ink)}
-.pill.running{background:var(--gold);color:#1c2430}.pill.open{background:#2f6f6a;color:#fff}.pill.ended{background:#555;color:#fff}.pill.not_started{background:var(--line)}
+.pill.running{background:var(--gold);color:#1c2430}.pill.open{background:#2f6f6a;color:#fff}.pill.ended{background:#555;color:#fff}.pill.cancelled{background:var(--bad);color:#fff}.pill.not_started{background:var(--line)}
 .pill.ok{background:var(--ok);color:#fff}.pill.warn{background:var(--warn);color:#fff}.pill.bad{background:var(--bad);color:#fff}
 .big{font-size:1.9rem;font-weight:800;line-height:1.15}
 .muted{color:var(--muted)}.small{font-size:.88rem}
@@ -98,7 +98,7 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
     host.prepend(h("div", { class: "msg flash " + kind, text: text }));
     if (kind === "ok") setTimeout(function () { var x = host.querySelector(".flash"); if (x) x.remove(); }, 5000);
   }
-  var STATUS = { not_started: "Not open yet", open: "Open, no bids", running: "Bidding live", ended: "Ended" };
+  var STATUS = { not_started: "Not open yet", open: "Open, no bids", running: "Bidding live", ended: "Ended", cancelled: "Cancelled" };
   var WSTAT = { awaiting_escrow: "Awaiting escrow", escrow_open: "Escrow opened", paid: "Paid", transferred: "Transferred", defaulted: "Winner defaulted" };
 
   /* ---------- login ---------- */
@@ -142,6 +142,7 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
       d.auctions.forEach(function (a) {
         var line;
         if (a.status === "running") line = "Closes " + when(a.endsAt);
+        else if (a.status === "cancelled") line = "Cancelled by you";
         else if (a.status === "ended") line = a.currentBid ? "Ended " + when(a.endsAt) + " · " + (WSTAT[a.winnerStatus] || "") : "Ended with no bids";
         else line = "Minimum bid " + money(a.minBid);
         grid.appendChild(h("div", { class: "card" },
@@ -203,7 +204,18 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
         h("p"),
         h("div", { class: "row" },
           h("a", { class: "btn", href: c.siteUrl + "/auction.html", target: "_blank", rel: "noopener", text: "View public auction page" }),
-          h("a", { class: "btn ghost", href: "/admin/api/auctions/" + encodeURIComponent(id) + "/bids.csv", text: "Download bids (CSV)" }))));
+          h("a", { class: "btn ghost", href: "/admin/api/auctions/" + encodeURIComponent(id) + "/bids.csv", text: "Download bids (CSV)" }),
+          d.cancelled
+            ? h("button", { class: "ghost", text: "Reopen as a fresh auction", onclick: function () {
+                if (!confirm("Reopen " + c.title + "? All old bids are cleared and the auction starts over with no bids.")) return;
+                api("POST", "/admin/api/auctions/" + encodeURIComponent(id) + "/reopen", {}).then(function () { showDetail(id); }).catch(function (e) { flash(main, e.message, "err"); });
+              } })
+            : (s.status === "ended" ? null : h("button", { class: "danger", text: "Cancel auction", onclick: function () {
+                var why = prompt("Cancel the auction for " + c.title + "?\n\nEvery bidder is emailed that it was cancelled and they owe nothing. Enter a short reason for your records:");
+                if (!why || !why.trim()) return;
+                api("POST", "/admin/api/auctions/" + encodeURIComponent(id) + "/cancel", { reason: why }).then(function () { showDetail(id); }).catch(function (e) { flash(main, e.message, "err"); });
+              } })))));
+      if (d.cancelled) main.appendChild(h("div", { class: "msg err", text: "This auction is cancelled" + (d.cancelReason ? ": " + d.cancelReason : ".") + " The public page shows it as cancelled and takes no bids." }));
 
       main.appendChild(settingsCard(d));
       if (d.ranking.length) main.appendChild(rankingCard(d));
@@ -261,11 +273,22 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
     return card;
   }
 
+  function removeBids(d, ids, who) {
+    var why = prompt("Remove " + who + " from the auction?\n\nThey are emailed that the bid no longer counts and they owe nothing. If this was the only bid, the clock resets. Enter a short reason for your records (for example: stopped responding):");
+    if (!why || !why.trim()) return;
+    var chain = Promise.resolve();
+    ids.forEach(function (bidId) { chain = chain.then(function () { return api("POST", "/admin/api/bids/" + bidId + "/void", { reason: why }); }); });
+    chain.then(function () { showDetail(d.id); }).catch(function (e) { var m = app.querySelector("main"); if (m) flash(m, e.message, "err"); });
+  }
   function rankingCard(d) {
-    var tb = h("table", {}, h("tr", {}, h("th", { text: "#" }), h("th", { text: "Bidder" }), h("th", { text: "Best bid" }), h("th", { text: "Contact" })));
+    var tb = h("table", {}, h("tr", {}, h("th", { text: "#" }), h("th", { text: "Bidder" }), h("th", { text: "Best bid" }), h("th", { text: "Contact" }), h("th", {})));
     d.ranking.forEach(function (b, i) {
       tb.appendChild(h("tr", {}, h("td", { text: i + 1 }), h("td", { text: b.name + (b.company ? " (" + b.company + ")" : "") }), h("td", { text: money(b.amount) }),
-        h("td", {}, h("a", { href: "mailto:" + b.email, text: b.email }), h("div", { class: "muted small", text: b.phone || "" }))));
+        h("td", {}, h("a", { href: "mailto:" + b.email, text: b.email }), h("div", { class: "muted small", text: b.phone || "" })),
+        h("td", {}, d.cancelled ? null : h("button", { class: "ghost", text: "Remove bidder", onclick: function () {
+          var ids = d.bids.filter(function (x) { return x.email === b.email && (x.status === "verified" || x.status === "pending"); }).map(function (x) { return x.id; });
+          removeBids(d, ids, b.name);
+        } }))));
     });
     return h("div", { class: "card" }, h("h2", { text: d.state.status === "ended" ? "Final standings" : "Bidders, highest first" }),
       h("p", { class: "muted small", text: "If the winner does not pay, offer it to the next bidder down this list." }), h("div", { class: "scroll" }, tb));
@@ -285,11 +308,12 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
   }
 
   function bidsCard(d) {
-    var tb = h("table", {}, h("tr", {}, ["Entered", "Status", "Amount", "Bidder", "Email", "Phone"].map(function (t) { return h("th", { text: t }); })));
+    var tb = h("table", {}, h("tr", {}, ["Entered", "Status", "Amount", "Bidder", "Email", "Phone", ""].map(function (t) { return h("th", { text: t }); })));
     d.bids.forEach(function (b) {
-      var st = b.status === "verified" ? "Confirmed" : b.status === "pending" ? "Waiting for email" : "Rejected" + (b.reason ? " (" + b.reason + ")" : "");
+      var st = b.status === "verified" ? "Confirmed" : b.status === "pending" ? "Waiting for email" : (b.status === "voided" ? "Removed" : "Rejected") + (b.reason ? " (" + b.reason + ")" : "");
       tb.appendChild(h("tr", {}, h("td", { text: when(b.at) }), h("td", {}, h("span", { class: "pill " + (b.status === "verified" ? "ok" : b.status === "pending" ? "warn" : ""), text: st })),
-        h("td", { text: money(b.amount) }), h("td", { text: b.name + (b.company ? " (" + b.company + ")" : "") }), h("td", { text: b.email }), h("td", { text: b.phone || "" })));
+        h("td", { text: money(b.amount) }), h("td", { text: b.name + (b.company ? " (" + b.company + ")" : "") }), h("td", { text: b.email }), h("td", { text: b.phone || "" }),
+        h("td", {}, (b.status === "verified" || b.status === "pending") && !d.cancelled ? h("button", { class: "ghost", text: "Remove", onclick: function () { removeBids(d, [b.id], b.name + "'s " + money(b.amount) + " bid"); } }) : null)));
     });
     return h("div", { class: "card" }, h("h2", { text: "Every bid entered" }), d.bids.length ? h("div", { class: "scroll" }, tb) : h("p", { class: "muted", text: "No bids yet." }));
   }

@@ -54,7 +54,7 @@
     if (!state) return;
     var now = Date.now() + offset;
     var st = state.status;
-    var label = { not_started: "Opens soon", open: "Open for bids", running: "Bidding is live", ended: "Auction ended" }[st] || "";
+    var label = { not_started: "Opens soon", open: "Open for bids", running: "Bidding is live", ended: "Auction ended", cancelled: "Auction cancelled" }[st] || "";
     els.status.textContent = label;
     els.status.className = "a-status is-" + st;
 
@@ -74,6 +74,10 @@
       els.clockLabel.textContent = "The clock starts at the first bid";
       els.clock.textContent = state.durationDays + " days";
       els.meta.textContent = "The first confirmed bid of at least " + money(state.minBid) + " starts a " + state.durationDays + "-day countdown.";
+    } else if (st === "cancelled") {
+      els.clockLabel.textContent = "";
+      els.clock.textContent = "";
+      els.meta.textContent = "The owner has cancelled this auction. No sale will be made.";
     } else if (st === "ended") {
       els.clockLabel.textContent = "Closed";
       els.clock.textContent = state.endsAt ? fmtDate(state.endsAt) : "No bids were placed";
@@ -87,13 +91,16 @@
     var live = st === "running" || st === "open";
     els.formWrap.hidden = !live;
     els.closed.hidden = live;
+    els.closed.textContent = st === "cancelled" ? "This auction has been cancelled." : st === "ended" ? "Bidding has ended." : "Bidding is not open right now.";
     if (live) {
       els.min.textContent = money(state.nextMinBid);
       els.amountInput.setAttribute("min", state.nextMinBid);
       els.amountInput.placeholder = String(state.nextMinBid);
     }
 
-    els.historyWrap.hidden = !state.history.length;
+    var rm = document.getElementById("a-removed");
+    if (rm) { rm.hidden = !state.removedBids; rm.textContent = state.removedBids ? state.removedBids + " bid" + (state.removedBids === 1 ? " was" : "s were") + " removed by the owner (for example, a bidder who could not be reached)." : ""; }
+    els.historyWrap.hidden = !state.history.length && !state.removedBids;
     els.history.innerHTML = "";
     state.history.forEach(function (h) {
       var li = document.createElement("li");
