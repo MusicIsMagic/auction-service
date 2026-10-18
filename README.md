@@ -13,13 +13,21 @@ One small service that runs open auctions for any number of properties.
 | Name | Value |
 |---|---|
 | `PUBLIC_BASE_URL` | The service's own https URL, no trailing slash |
-| `ADMIN_TOKEN` | A long random string. Opens the seller view at `/admin/<auction id>?token=...` |
+| `ADMIN_TOKEN` | Your dashboard password. Use a long random string. Sign in at `<service address>/admin` |
 | `SELLER_EMAIL` | Where new-bid and auction-ended alerts go |
 | `SMTP_USER` | Gmail address that sends the emails |
 | `SMTP_PASS` | A Gmail app password (not the normal password) |
 | `DATA_DIR` | `/var/data` (the persistent disk mount path) |
 | `NODE_VERSION` | `22` |
 
+## Seller dashboard (`/admin`)
+- Overview of every property: status, high bid, bidders, anything waiting on email confirmation.
+- Per property: every bid with contact details, fallback order, CSV download, activity history.
+- Edit rules (minimum, increment, countdown, late-bid window, open and cutoff times) until the first bid is confirmed. After that they lock.
+- Add a property, or delete one that has no bids.
+- After an auction ends: winner status (awaiting escrow, escrow opened, paid, transferred, defaulted) and private notes.
+- Test-email button to confirm Gmail sending works.
+
 ## Add another property
-Add an entry to `auctions.json` (copy an existing one), commit, and redeploy. Then build that site's `auction.html`
-with `build_auction_page.py`.
+Use **Add a property** in the dashboard. Then build that site's `auction.html` with `tools/build_auction_page.py`.
+(`auctions.json` only seeds the two starting properties on first run. After that, the dashboard is the source of truth.)

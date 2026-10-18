@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Auction dashboard</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1c2430;--muted:#5d6877;--line:#d9dde3;--brand:#1f4e79;--brand-d:#163a5b;--ok:#1f7a45;--warn:#a86400;--bad:#b3261e;--gold:#d6a03b}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--card:#1b222b;--ink:#e8ecf1;--muted:#9aa5b4;--line:#2d3744;--brand:#6aa7e0;--brand-d:#8cbdec;--ok:#58c183;--warn:#e0a24a;--bad:#f07b73}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--brand)}
+header.top{background:#16202c;color:#fff;padding:.8rem 1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+header.top h1{font-size:1.15rem;margin:0;flex:1;min-width:10rem}
+header.top a{color:#fff}
+main{max-width:1100px;margin:0 auto;padding:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;margin-bottom:1rem}
+.card h2{margin:0 0 .6rem;font-size:1.1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15rem .5rem;border-radius:99px;background:var(--line);color:var(--ink)}
+.pill.running{background:var(--gold);color:#1c2430}.pill.open{background:#2f6f6a;color:#fff}.pill.ended{background:#555;color:#fff}.pill.not_started{background:var(--line)}
+.pill.ok{background:var(--ok);color:#fff}.pill.warn{background:var(--warn);color:#fff}.pill.bad{background:var(--bad);color:#fff}
+.big{font-size:1.9rem;font-weight:800;line-height:1.15}
+.muted{color:var(--muted)}.small{font-size:.88rem}
+.row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.spread{justify-content:space-between}
+button,.btn{font:inherit;font-weight:600;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:.5rem .9rem;border-radius:7px;cursor:pointer;text-decoration:none;display:inline-block}
+@media (prefers-color-scheme:dark){button,.btn{color:#10151b}}
+button.ghost,.btn.ghost{background:transparent;color:var(--brand)}
+button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+label{display:block;font-weight:600;font-size:.9rem;margin-bottom:.2rem}
+input,select,textarea{font:inherit;width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
+input:disabled,select:disabled{opacity:.6}
+textarea{min-height:6rem}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.scroll{overflow-x:auto}
+.msg{padding:.6rem .8rem;border-radius:7px;margin:.6rem 0;font-weight:600}
+.msg.ok{background:#e1f2e8;color:#165c35}.msg.err{background:#fbe5e3;color:#8a1f19}.msg.info{background:#e6eef7;color:#1d3d5e}
+@media (prefers-color-scheme:dark){.msg.ok{background:#173a27;color:#9be0b8}.msg.err{background:#40201e;color:#ffb4ad}.msg.info{background:#1c2b3d;color:#b7d3f0}}
+.login{max-width:360px;margin:12vh auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+.stat .k{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.stat .v{font-size:1.4rem;font-weight:800}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+  "use strict";
+  var app = document.getElementById("app");
+  var timer = null;
+
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === "class") el.className = attrs[k];
+      else if (k === "text") el.textContent = attrs[k];
+      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] !== false && attrs[k] !== null && attrs[k] !== undefined) el.setAttribute(k, attrs[k] === true ? "" : attrs[k]);
+    });
+    function add(c) {
+      if (c === null || c === undefined || c === false) return;
+      if (Array.isArray(c)) { c.forEach(add); return; }
+      el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+    }
+    for (var i = 2; i < arguments.length; i++) add(arguments[i]);
+    return el;
+  }
+  function money(n) { return n === null || n === undefined ? "none" : "$" + Number(n).toLocaleString("en-US"); }
+  function when(ms) { return ms ? new Date(ms).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "-"; }
+  function api(method, url, body) {
+    var o = { method: method, headers: { "X-Requested-With": "admin" }, credentials: "same-origin" };
+    if (body !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(body); }
+    return fetch(url, o).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.status === 401 && url.indexOf("/login") < 0) { showLogin(); throw new Error("signed out"); }
+        if (!r.ok) throw new Error(j.error || "Something went wrong.");
+        return j;
+      });
+    });
+  }
+  function toLocalInput(iso) {
+    if (!iso) return "";
+    var d = new Date(iso); if (isNaN(d)) return "";
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function fromLocalInput(v) { return v ? new Date(v).toISOString() : null; }
+  function flash(host, text, kind) {
+    var m = host.querySelector(".flash"); if (m) m.remove();
+    host.prepend(h("div", { class: "msg flash " + kind, text: text }));
+    if (kind === "ok") setTimeout(function () { var x = host.querySelector(".flash"); if (x) x.remove(); }, 5000);
+  }
+  var STATUS = { not_started: "Not open yet", open: "Open, no bids", running: "Bidding live", ended: "Ended" };
+  var WSTAT = { awaiting_escrow: "Awaiting escrow", escrow_open: "Escrow opened", paid: "Paid", transferred: "Transferred", defaulted: "Winner defaulted" };
+
+  /* ---------- login ---------- */
+  function showLogin() {
+    clearInterval(timer);
+    app.innerHTML = "";
+    var err = h("div", { class: "msg err", hidden: true });
+    var pw = h("input", { type: "password", id: "pw", autocomplete: "current-password", placeholder: "Dashboard password" });
+    var form = h("form", { class: "card login", onsubmit: function (e) {
+      e.preventDefault(); err.hidden = true;
+      api("POST", "/admin/api/login", { token: pw.value }).then(route).catch(function (x) { err.textContent = x.message; err.hidden = false; });
+    } }, h("h2", { text: "Auction dashboard" }), h("label", { for: "pw", text: "Password" }), pw, err, h("p"), h("button", { type: "submit", text: "Sign in" }));
+    app.appendChild(form); pw.focus();
+  }
+
+  function topbar(extra) {
+    return h("header", { class: "top" }, h("h1", { text: "Auction dashboard" }), extra || null,
+      h("button", { class: "ghost", style: "color:#fff;border-color:#fff", text: "Sign out", onclick: function () { api("POST", "/admin/api/logout", {}).then(showLogin); } }));
+  }
+
+  /* ---------- overview ---------- */
+  function showOverview() {
+    api("GET", "/admin/api/summary").then(function (d) {
+      if (app.querySelector("main") && document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return; // do not clobber typing
+      app.innerHTML = "";
+      app.appendChild(topbar());
+      var main = h("main"); app.appendChild(main);
+
+      var hl = d.health;
+      var hcard = h("div", { class: "card" }, h("div", { class: "row spread" },
+        h("div", { class: "row" },
+          h("span", { class: "pill " + (hl.emailConfigured ? "ok" : "bad"), text: hl.emailConfigured ? "Email ready" : "Email not set up" }),
+          h("span", { class: "pill " + (hl.httpsBase ? "ok" : "warn"), text: hl.httpsBase ? "Secure address" : "Address is not https" }),
+          h("span", { class: "muted small", text: "Alerts go to " + (hl.sellerEmail || "(no seller email set)") })),
+        h("button", { class: "ghost", text: "Send test email", onclick: function () {
+          api("POST", "/admin/api/test-email", {}).then(function (r) { flash(main, "Test email sent to " + r.to + ".", "ok"); }).catch(function (e) { flash(main, e.message, "err"); });
+        } })));
+      main.appendChild(hcard);
+
+      var grid = h("div", { class: "grid" });
+      d.auctions.forEach(function (a) {
+        var line;
+        if (a.status === "running") line = "Closes " + when(a.endsAt);
+        else if (a.status === "ended") line = a.currentBid ? "Ended " + when(a.endsAt) + " · " + (WSTAT[a.winnerStatus] || "") : "Ended with no bids";
+        else line = "Minimum bid " + money(a.minBid);
+        grid.appendChild(h("div", { class: "card" },
+          h("div", { class: "row spread" }, h("strong", { text: a.title }), h("span", { class: "pill " + a.status, text: STATUS[a.status] || a.status })),
+          h("div", { class: "big", text: a.currentBid ? money(a.currentBid) : "No bids" }),
+          h("div", { class: "muted small", text: line }),
+          h("div", { class: "muted small", text: a.bidCount + " confirmed bid" + (a.bidCount === 1 ? "" : "s") + " · " + a.bidders + " bidder" + (a.bidders === 1 ? "" : "s") + (a.pending ? " · " + a.pending + " waiting on email confirmation" : "") }),
+          h("p"),
+          h("div", { class: "row" },
+            h("a", { class: "btn", href: "#/" + encodeURIComponent(a.id), text: "Open" }),
+            h("a", { class: "btn ghost", href: a.siteUrl + "/auction.html", target: "_blank", rel: "noopener", text: "Public page" }))));
+      });
+      main.appendChild(grid);
+
+      main.appendChild(addForm(main));
+
+      var tb = h("table", {}, h("tr", {}, h("th", { text: "When" }), h("th", { text: "Property" }), h("th", { text: "Event" }), h("th", { text: "Detail" })));
+      d.audit.forEach(function (r) { tb.appendChild(h("tr", {}, h("td", { text: when(r.at) }), h("td", { text: r.auction_id || "" }), h("td", { text: r.action }), h("td", { text: r.detail || "" }))); });
+      main.appendChild(h("div", { class: "card" }, h("h2", { text: "Recent activity" }), d.audit.length ? h("div", { class: "scroll" }, tb) : h("p", { class: "muted", text: "Nothing yet." })));
+    }).catch(function (e) { if (e.message !== "signed out") app.textContent = e.message; });
+  }
+
+  function addForm(main) {
+    var det = h("details", { class: "card" }, h("summary", { text: "Add a property" }));
+    var f = {
+      id: h("input", { placeholder: "example.com" }),
+      title: h("input", { placeholder: "ExampleName.com" }),
+      minBid: h("input", { type: "number", value: "2500", min: "1" })
+    };
+    var btn = h("button", { text: "Add property", onclick: function () {
+      api("POST", "/admin/api/auctions", { id: f.id.value, title: f.title.value || f.id.value, siteUrl: "https://" + f.id.value.trim().toLowerCase(), minBid: f.minBid.value })
+        .then(function (r) { location.hash = "#/" + encodeURIComponent(r.id); })
+        .catch(function (e) { flash(det, e.message, "err"); });
+    } });
+    det.appendChild(h("div", { class: "fields", style: "margin-top:.8rem" },
+      h("div", {}, h("label", { text: "Domain" }), f.id), h("div", {}, h("label", { text: "Display name" }), f.title), h("div", {}, h("label", { text: "Minimum bid ($)" }), f.minBid)));
+    det.appendChild(h("p", { class: "muted small", text: "You can change every rule on the next screen before the first bid arrives. Then build that site's auction page with the tools in the service's repo." }));
+    det.appendChild(btn);
+    return det;
+  }
+
+  /* ---------- detail ---------- */
+  function showDetail(id) {
+    api("GET", "/admin/api/auctions/" + encodeURIComponent(id)).then(function (d) {
+      if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && app.querySelector("[data-detail='" + id + "']")) return; // do not clobber typing
+      app.innerHTML = "";
+      app.appendChild(topbar(h("a", { href: "#/", text: "← All properties" })));
+      var main = h("main", { "data-detail": id }); app.appendChild(main);
+      var s = d.state, c = d.config;
+
+      main.appendChild(h("div", { class: "card" },
+        h("div", { class: "row spread" }, h("h2", { style: "margin:0", text: c.title }), h("span", { class: "pill " + s.status, text: STATUS[s.status] })),
+        h("p"),
+        h("div", { class: "stats" },
+          stat("High bid", money(s.currentBid)),
+          stat("Confirmed bids", String(s.bidCount)),
+          stat("Bidders", String(d.ranking.length)),
+          stat(s.status === "ended" ? "Closed" : "Closes", s.endsAt ? when(s.endsAt) : "Not started")),
+        h("p"),
+        h("div", { class: "row" },
+          h("a", { class: "btn", href: c.siteUrl + "/auction.html", target: "_blank", rel: "noopener", text: "View public auction page" }),
+          h("a", { class: "btn ghost", href: "/admin/api/auctions/" + encodeURIComponent(id) + "/bids.csv", text: "Download bids (CSV)" }))));
+
+      main.appendChild(settingsCard(d));
+      if (d.ranking.length) main.appendChild(rankingCard(d));
+      if (s.status === "ended" && d.ranking.length) main.appendChild(workflowCard(d));
+      main.appendChild(bidsCard(d));
+      main.appendChild(auditCard(d));
+      if (!d.bids.length) main.appendChild(h("div", { class: "card" }, h("h2", { text: "Remove property" }),
+        h("p", { class: "muted", text: "Only possible while there are no bids." }),
+        h("button", { class: "danger", text: "Delete this property", onclick: function () {
+          if (!confirm("Delete " + c.title + " from the auction service?")) return;
+          api("DELETE", "/admin/api/auctions/" + encodeURIComponent(id)).then(function () { location.hash = "#/"; }).catch(function (e) { flash(main, e.message, "err"); });
+        } })));
+    }).catch(function (e) { if (e.message !== "signed out") app.textContent = e.message; });
+  }
+  function stat(k, v) { return h("div", { class: "stat" }, h("div", { class: "k", text: k }), h("div", { class: "v", text: v })); }
+
+  function settingsCard(d) {
+    var c = d.config, lock = d.locked;
+    var f = {
+      title: h("input", { value: c.title }),
+      siteUrl: h("input", { value: c.siteUrl }),
+      allowedOrigins: h("textarea", { style: "min-height:4.5rem" }),
+      minBid: h("input", { type: "number", min: "1", value: c.minBid, disabled: lock }),
+      increment: h("input", { type: "number", min: "1", value: c.increment, disabled: lock }),
+      durationDays: h("input", { type: "number", min: "1", max: "120", value: c.durationDays, disabled: lock }),
+      softCloseHours: h("input", { type: "number", min: "0", max: "240", value: c.softCloseHours, disabled: lock }),
+      opensAt: h("input", { type: "datetime-local", value: toLocalInput(c.opensAt), disabled: lock }),
+      bidsOpenUntil: h("input", { type: "datetime-local", value: toLocalInput(c.bidsOpenUntil), disabled: lock })
+    };
+    f.allowedOrigins.value = (c.allowedOrigins || []).join("\n");
+    var card = h("div", { class: "card" }, h("h2", { text: "Rules and settings" }));
+    card.appendChild(h("div", { class: "msg " + (lock ? "info" : "ok"), text: lock ? "A bid has been confirmed, so the rules are locked. This keeps the auction fair for bidders. You can still change the name and site addresses." : "No bids yet, so you can change any rule. They lock when the first bid is confirmed." }));
+    function fld(label, el, hint) { return h("div", {}, h("label", { text: label }), el, hint ? h("div", { class: "muted small", text: hint }) : null); }
+    card.appendChild(h("div", { class: "fields" },
+      fld("Display name", f.title),
+      fld("Site address", f.siteUrl, "Where the auction page lives, like https://example.com"),
+      fld("Minimum opening bid ($)", f.minBid, "This is also your floor: a lone bid at this amount wins."),
+      fld("Raise increment ($)", f.increment),
+      fld("Countdown length (days)", f.durationDays, "Starts at the first confirmed bid."),
+      fld("Late-bid window (hours)", f.softCloseHours, "A bid inside this window pushes the close out this far. 0 turns it off."),
+      fld("Open for bids at", f.opensAt, "Leave empty to open immediately. Shown in your local time."),
+      fld("Latest time for a first bid", f.bidsOpenUntil, "Optional. If nobody has bid by then, the auction ends with no sale.")));
+    card.appendChild(h("div", { style: "margin-top:.9rem" }, h("label", { text: "Sites allowed to talk to the auction (one per line)" }), f.allowedOrigins,
+      h("div", { class: "muted small", text: "Include the www version and the onrender.com address if you use them." })));
+    card.appendChild(h("p"));
+    card.appendChild(h("button", { text: "Save changes", onclick: function () {
+      var body = { title: f.title.value, siteUrl: f.siteUrl.value, allowedOrigins: f.allowedOrigins.value };
+      if (!lock) {
+        body.minBid = f.minBid.value; body.increment = f.increment.value; body.durationDays = f.durationDays.value;
+        body.softCloseHours = f.softCloseHours.value; body.opensAt = fromLocalInput(f.opensAt.value); body.bidsOpenUntil = fromLocalInput(f.bidsOpenUntil.value);
+      }
+      api("PUT", "/admin/api/auctions/" + encodeURIComponent(d.id), body).then(function () { document.activeElement.blur(); showDetail(d.id); setTimeout(function () { var m = app.querySelector("main"); if (m) flash(m, "Saved.", "ok"); }, 400); })
+        .catch(function (e) { flash(card, e.message, "err"); });
+    } }));
+    return card;
+  }
+
+  function rankingCard(d) {
+    var tb = h("table", {}, h("tr", {}, h("th", { text: "#" }), h("th", { text: "Bidder" }), h("th", { text: "Best bid" }), h("th", { text: "Contact" })));
+    d.ranking.forEach(function (b, i) {
+      tb.appendChild(h("tr", {}, h("td", { text: i + 1 }), h("td", { text: b.name + (b.company ? " (" + b.company + ")" : "") }), h("td", { text: money(b.amount) }),
+        h("td", {}, h("a", { href: "mailto:" + b.email, text: b.email }), h("div", { class: "muted small", text: b.phone || "" }))));
+    });
+    return h("div", { class: "card" }, h("h2", { text: d.state.status === "ended" ? "Final standings" : "Bidders, highest first" }),
+      h("p", { class: "muted small", text: "If the winner does not pay, offer it to the next bidder down this list." }), h("div", { class: "scroll" }, tb));
+  }
+
+  function workflowCard(d) {
+    var sel = h("select", {});
+    Object.keys(WSTAT).forEach(function (k) { var o = h("option", { value: k, text: WSTAT[k] }); if (k === d.winnerStatus) o.selected = true; sel.appendChild(o); });
+    var notes = h("textarea", { placeholder: "Escrow transaction number, buyer details, anything to remember." }); notes.value = d.notes || "";
+    var card = h("div", { class: "card" }, h("h2", { text: "After the auction" }),
+      h("div", { class: "fields" }, h("div", {}, h("label", { text: "Winner status" }), sel)),
+      h("div", { style: "margin-top:.8rem" }, h("label", { text: "Notes (private)" }), notes), h("p"),
+      h("button", { text: "Save", onclick: function () {
+        api("PUT", "/admin/api/auctions/" + encodeURIComponent(d.id) + "/workflow", { winnerStatus: sel.value, notes: notes.value }).then(function () { flash(card, "Saved.", "ok"); }).catch(function (e) { flash(card, e.message, "err"); });
+      } }));
+    return card;
+  }
+
+  function bidsCard(d) {
+    var tb = h("table", {}, h("tr", {}, ["Entered", "Status", "Amount", "Bidder", "Email", "Phone"].map(function (t) { return h("th", { text: t }); })));
+    d.bids.forEach(function (b) {
+      var st = b.status === "verified" ? "Confirmed" : b.status === "pending" ? "Waiting for email" : "Rejected" + (b.reason ? " (" + b.reason + ")" : "");
+      tb.appendChild(h("tr", {}, h("td", { text: when(b.at) }), h("td", {}, h("span", { class: "pill " + (b.status === "verified" ? "ok" : b.status === "pending" ? "warn" : ""), text: st })),
+        h("td", { text: money(b.amount) }), h("td", { text: b.name + (b.company ? " (" + b.company + ")" : "") }), h("td", { text: b.email }), h("td", { text: b.phone || "" })));
+    });
+    return h("div", { class: "card" }, h("h2", { text: "Every bid entered" }), d.bids.length ? h("div", { class: "scroll" }, tb) : h("p", { class: "muted", text: "No bids yet." }));
+  }
+
+  function auditCard(d) {
+    var tb = h("table", {}, h("tr", {}, h("th", { text: "When" }), h("th", { text: "Event" }), h("th", { text: "Detail" })));
+    d.audit.forEach(function (r) { tb.appendChild(h("tr", {}, h("td", { text: when(r.at) }), h("td", { text: r.action }), h("td", { text: r.detail || "" }))); });
+    return h("div", { class: "card" }, h("h2", { text: "History" }), d.audit.length ? h("div", { class: "scroll" }, tb) : h("p", { class: "muted", text: "Nothing yet." }));
+  }
+
+  /* ---------- routing ---------- */
+  function route() {
+    clearInterval(timer);
+    var m = location.hash.match(/^#\/(.+)$/);
+    if (m) { var id = decodeURIComponent(m[1]); showDetail(id); timer = setInterval(function () { showDetail(id); }, 30000); }
+    else { showOverview(); timer = setInterval(showOverview, 30000); }
+  }
+  window.addEventListener("hashchange", route);
+  route();
+})();
+</script>
+</body>
+</html>
