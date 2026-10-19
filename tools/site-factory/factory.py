@@ -72,6 +72,21 @@ def _crop(im, w, h, ax=0.5, ay=0.5):
     return im2.crop((x, y, x + w, y + h))
 
 
+def _trim_white(im, thr=222, frac=0.5, pad=4):
+    """remove near-white gutter lines from the edges of a cell, then a few pixels of safety margin"""
+    import numpy as np
+    a = np.array(im).astype(int)
+    white = a.min(axis=2) > thr
+    h, w = white.shape
+    t, b, l, r = 0, h, 0, w
+    while t < h // 4 and white[t, l:r].mean() > frac: t += 1
+    while b > h - h // 4 and white[b - 1, l:r].mean() > frac: b -= 1
+    while l < w // 4 and white[t:b, l].mean() > frac: l += 1
+    while r > w - w // 4 and white[t:b, r - 1].mean() > frac: r -= 1
+    pw, ph = int((r - l) * 0.025) + pad, int((b - t) * 0.025) + pad
+    return im.crop((l + pw, t + ph, r - pw, b - ph))
+
+
 def _cells(path, cols, rows, inset=0.012):
     from PIL import Image
     im = Image.open(path).convert("RGB")
@@ -80,8 +95,11 @@ def _cells(path, cols, rows, inset=0.012):
     out = []
     for r in range(rows):
         for c in range(cols):
-            x0, y0 = c * cw + cw * inset, r * ch + ch * inset
-            out.append(im.crop((int(x0), int(y0), int(c * cw + cw - cw * inset), int(r * ch + ch - ch * inset))))
+            # take the cell with a little slack on each side so gutters of slightly uneven width are caught, then trim white
+            x0, y0 = c * cw, r * ch
+            x1, y1 = (c + 1) * cw, (r + 1) * ch
+            cell = im.crop((int(x0), int(y0), int(x1), int(y1)))
+            out.append(_trim_white(cell))
     return out
 
 
