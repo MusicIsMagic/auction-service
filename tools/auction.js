@@ -98,6 +98,13 @@
       els.amountInput.placeholder = String(state.nextMinBid);
     }
 
+    var cta = document.getElementById("a-cta");
+    if (cta) {
+      if (live) { cta.textContent = "Place a bid"; cta.setAttribute("href", "#bid-form-wrap"); cta.hidden = false; }
+      else if (st === "ended" || st === "cancelled") { cta.hidden = true; }
+      else { cta.textContent = "Bidding opens soon"; cta.setAttribute("href", "#auction-panel"); cta.hidden = false; }
+    }
+
     var rm = document.getElementById("a-removed");
     if (rm) { rm.hidden = !state.removedBids; rm.textContent = state.removedBids ? state.removedBids + " bid" + (state.removedBids === 1 ? " was" : "s were") + " removed by the owner (for example, a bidder who could not be reached)." : ""; }
     els.historyWrap.hidden = !state.history.length && !state.removedBids;
@@ -118,6 +125,8 @@
       .catch(function () { if (!state) unavailable(); });
   }
   function unavailable() {
+    var c2 = document.getElementById("a-cta");
+    if (c2) { c2.textContent = "Bidding opens soon"; c2.setAttribute("href", "#auction-panel"); }
     els.status.textContent = "Opening soon";
     els.status.className = "a-status is-not_started";
     els.label.textContent = "Bidding";

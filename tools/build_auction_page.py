@@ -54,6 +54,7 @@ main = f"""<main id="main">
 <div class="wrap">
 <h1>{S['name']} is for sale</h1>
 <p>One complete digital property, offered to one buyer by open auction.</p>
+<p style="margin-top:1.4rem"><a class="btn" id="a-cta" href="#auction-panel">Place a bid</a></p>
 </div>
 </section>
 <div class="strata" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
