@@ -43,7 +43,7 @@ head = re.sub(r'(<meta property="og:description" content=")[^"]*(")', lambda m: 
 head = re.sub(r'(<meta property="og:url" content=")[^"]*(")', lambda m: m.group(1) + f"https://{S['host']}/auction.html" + m.group(2), head)
 head = head.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex, follow">', 1)
 if "js/auction.js" not in head:
-    head = head.replace('<script src="js/main.js" defer></script>', '<script src="js/main.js" defer></script>\n<script src="js/auction.js" defer></script>')
+    head = head.replace('<script src="js/main.js" defer></script>', '<script src="js/main.js" defer></script>\n<script src="js/auction.js?v=3" defer></script>')
 # nav: no item is current on this page
 head = head.replace(' aria-current="page"', "")
 
