@@ -27,5 +27,61 @@
     "softCloseHours": 72,
     "opensAt": null,
     "bidsOpenUntil": null
+  },
+  "massachusettspestcontrol.com": {
+    "title": "MassachusettsPestControl.com",
+    "siteUrl": "https://massachusettspestcontrol.com",
+    "allowedOrigins": [
+      "https://massachusettspestcontrol.com",
+      "https://www.massachusettspestcontrol.com"
+    ],
+    "minBid": 1500,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
+  },
+  "poolservicedallas.com": {
+    "title": "PoolServiceDallas.com",
+    "siteUrl": "https://poolservicedallas.com",
+    "allowedOrigins": [
+      "https://poolservicedallas.com",
+      "https://www.poolservicedallas.com"
+    ],
+    "minBid": 1500,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
+  },
+  "poolservicemiami.com": {
+    "title": "PoolServiceMiami.com",
+    "siteUrl": "https://poolservicemiami.com",
+    "allowedOrigins": [
+      "https://poolservicemiami.com",
+      "https://www.poolservicemiami.com"
+    ],
+    "minBid": 1500,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
+  },
+  "poolservicelasvegas.com": {
+    "title": "PoolServiceLasVegas.com",
+    "siteUrl": "https://poolservicelasvegas.com",
+    "allowedOrigins": [
+      "https://poolservicelasvegas.com",
+      "https://www.poolservicelasvegas.com"
+    ],
+    "minBid": 1500,
+    "increment": 100,
+    "durationDays": 30,
+    "softCloseHours": 72,
+    "opensAt": null,
+    "bidsOpenUntil": null
   }
 }

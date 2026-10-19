@@ -27,14 +27,24 @@ SITES = {
         sections="a sights and hikes guide, wildlife-viewing safety guidance, a season-by-season planner, lodging and tour guidance",
     ),
 }
-S = SITES[key]
+if key in SITES:
+    S = SITES[key]
+else:
+    import json
+    S = json.loads((site / "auction-config.json").read_text())
+S.setdefault("base_page", "plan-your-trip.html")
+S.setdefault("header_html", '<img src="images/header-plan.jpg" data-fallback="images/art/header-plan.svg" alt="" width="1600" height="500" fetchpriority="high">')
+S.setdefault("terms_disclaimer", "This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.")
+S.setdefault("guide_word", "visitor guide")
+S.setdefault("lead_phrase", "a trip-planning form")
+S.setdefault("name_phrase", "an exact-match name for visitors searching for " + S["place"])
 
-src = (site / "plan-your-trip.html").read_text()
+src = (site / S["base_page"]).read_text()
 head, rest = src.split('<main id="main">', 1)
 _, tail = rest.split("</main>", 1)
 
 title = f"{S['name']}: Digital Property for Sale by Auction"
-desc = f"{S['name']} is offered as a complete digital property: the name, a finished visitor guide, and a working lead-capture form. Bids are open."
+desc = f"{S['name']} is offered as a complete digital property: the name, a finished {S["guide_word"]}, and a working lead-capture form. Bids are open."
 head = re.sub(r"<title>.*?</title>", f"<title>{title}</title>", head, flags=re.S)
 head = re.sub(r'(<meta name="description" content=")[^"]*(")', lambda m: m.group(1) + desc + m.group(2), head)
 head = re.sub(r'(<link rel="canonical" href=")[^"]*(")', lambda m: m.group(1) + f"https://{S['host']}/auction.html" + m.group(2), head)
@@ -50,7 +60,7 @@ head = head.replace(' aria-current="page"', "")
 main = f"""<main id="main">
 
 <section class="page-head">
-<img src="images/header-plan.jpg" data-fallback="images/art/header-plan.svg" alt="" width="1600" height="500" fetchpriority="high">
+{S['header_html']}
 <div class="wrap">
 <h1>{S['name']} is for sale</h1>
 <p>One complete digital property, offered to one buyer by open auction.</p>
@@ -103,9 +113,9 @@ main = f"""<main id="main">
 <aside class="a-side">
 <h2>What the buyer gets</h2>
 <ul class="a-list">
-<li><strong>The name:</strong> {S['name']}, an exact-match name for visitors searching for {S['place']}.</li>
+<li><strong>The name:</strong> {S['name']}, {S['name_phrase']}.</li>
 <li><strong>A finished website:</strong> {S['pages']}. It includes {S['sections']}, all written for this site.</li>
-<li><strong>Lead capture, already working:</strong> a trip-planning form that delivers requests to the owner's email.</li>
+<li><strong>Lead capture, already working:</strong> {S['lead_phrase']} that delivers requests to the owner's email.</li>
 <li><strong>Design and image files,</strong> and the complete source, ready to host anywhere.</li>
 <li><strong>A clean transfer</strong> of the name and files through Escrow.com.</li>
 </ul>
@@ -121,7 +131,7 @@ main = f"""<main id="main">
 </ol>
 
 <h2>Terms</h2>
-<p class="fine" style="margin-top:0">A confirmed bid is binding on the bidder. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. This is an independent visitor guide and is not affiliated with the National Park Service or any government agency, and no traffic, revenue, or search-ranking figures are claimed or implied.</p>
+<p class="fine" style="margin-top:0">A confirmed bid is binding on the bidder. The highest confirmed bid when the auction closes wins. The winner opens an Escrow.com transaction within 7 days of closing and pays through it. The buyer pays the escrow fee. If the winner does not complete payment, the owner may offer the property to the next-highest bidder. The property transfers when Escrow.com confirms payment. Images on this site are illustrative and may be computer-generated. {S['terms_disclaimer']}</p>
 <p class="fine"><strong>Right to remove bids and cancel.</strong> Until a bidder has funded an Escrow.com transaction for this property, the owner may, at the owner's sole discretion and at any time, remove any bid or cancel the auction, for any reason, including if a bidder cannot be reached, does not respond, or does not open or fund escrow. A removed bid or a cancelled auction releases the bidder, who then owes nothing. Once a buyer has funded an Escrow.com transaction for this property, the owner will not cancel the sale or remove that bid, and the sale will be completed under the Escrow.com terms. Removed bids are counted on this page.</p>
 
 <form id="ask-form" class="ask-form" novalidate>
