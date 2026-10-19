@@ -43,7 +43,7 @@ head = re.sub(r'(<meta property="og:description" content=")[^"]*(")', lambda m: 
 head = re.sub(r'(<meta property="og:url" content=")[^"]*(")', lambda m: m.group(1) + f"https://{S['host']}/auction.html" + m.group(2), head)
 head = head.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex, follow">', 1)
 if "js/auction.js" not in head:
-    head = head.replace('<script src="js/main.js" defer></script>', '<script src="js/main.js" defer></script>\n<script src="js/auction.js?v=3" defer></script>')
+    head = head.replace('<script src="js/main.js" defer></script>', '<script src="js/main.js" defer></script>\n<script src="js/auction.js?v=4" defer></script>')
 # nav: no item is current on this page
 head = head.replace(' aria-current="page"', "")
 
@@ -81,7 +81,7 @@ main = f"""<main id="main">
 <div id="bid-form-wrap" hidden>
 <form id="bid-form" class="lead-form" novalidate>
 <h2 style="margin-top:0">Place a bid</h2>
-<p class="fine" style="margin-top:0">Your next bid must be at least <strong id="a-min"></strong>. Your bid counts only after you confirm it by email.</p>
+<p class="fine" style="margin-top:0">Your next bid must be at least <strong id="a-min"></strong>. Your bid counts only after you confirm it by email. The email can land in spam or junk, so check there if it does not arrive.</p>
 <div class="hp" aria-hidden="true"><input type="text" name="hp_trap_field" tabindex="-1" autocomplete="off"></div>
 <div class="field-row">
 <div class="field"><label for="bid-name">Your name</label><input type="text" id="bid-name" name="name" autocomplete="name" required></div>

@@ -167,7 +167,7 @@
         btn.disabled = false;
         if (res.ok) {
           statusEl.className = "form-status is-ok";
-          statusEl.textContent = res.j.message || "Check your email to confirm your bid.";
+          statusEl.textContent = "Check your email and click the confirmation link. Your bid counts once you confirm it. If you do not see the email within a minute, check your spam or junk folder, and mark it \"not spam\" if you find it there.";
           f.amount.value = "";
         } else {
           statusEl.className = "form-status is-error";
