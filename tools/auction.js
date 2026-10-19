@@ -151,7 +151,7 @@
     var amount = parseInt(String(f.amount.value).replace(/[^0-9]/g, ""), 10);
     var body = {
       name: f.name.value, company: f.company.value, email: f.email.value, phone: f.phone.value,
-      amount: amount, acceptTerms: f.terms.checked, website: f.website.value
+      amount: amount, acceptTerms: f.terms.checked, hp_trap_field: f.hp_trap_field.value
     };
     if (!body.name.trim() || !body.email.trim() || !body.phone.trim() || !amount) {
       statusEl.className = "form-status is-error"; statusEl.textContent = "Please fill in your name, email, phone, and bid amount."; return;

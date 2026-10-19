@@ -105,12 +105,16 @@ const transport = SMTP_USER && SMTP_PASS
   : null;
 const outbox = []; // kept in memory for tests
 async function sendMail(to, subject, text) {
-  if (!to) return;
+  if (!to) return false;
   outbox.push({ to, subject, text });
   if (outbox.length > 200) outbox.shift();
-  if (!transport) { console.log("[mail:not-sent] to=%s subject=%s", to, subject); return; }
-  try { await transport.sendMail({ from: MAIL_FROM, to, subject, text }); }
-  catch (e) { console.error("mail failed:", to, e.message); }
+  if (!transport) { console.log("[mail:not-sent] to=%s subject=%s", to, subject); return TEST_MODE; }
+  try { await transport.sendMail({ from: MAIL_FROM, to, subject, text }); return true; }
+  catch (e) {
+    console.error("mail failed:", to, e.message);
+    try { audit(null, "email failed", to + ": " + subject + " (" + e.message + ")"); } catch (_) { /* audit is best effort */ }
+    return false;
+  }
 }
 const money = (n) => "$" + Number(n).toLocaleString("en-US");
 const fmtDate = (ms) => new Date(ms).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short", timeZone: "America/Phoenix" }) + " (Arizona time)";
@@ -202,7 +206,9 @@ app.post("/api/auctions/:id/bids", bidLimiter, async (req, res) => {
   const id = req.params.id, c = cfg(id);
   if (!c) return res.status(404).json({ error: "Unknown auction." });
   const b = req.body || {};
-  if (b.website) return res.json({ ok: true, message: "Check your email to confirm your bid." }); // honeypot
+  // Honeypot: a hidden field real visitors never fill. It must NOT have an autofillable name
+  // (like "website"), because browsers fill those and real bids would be silently dropped.
+  if (b.hp_trap_field) { console.warn("honeypot tripped, bid ignored"); return res.json({ ok: true, message: "Check your email to confirm your bid." }); }
   const name = String(b.name || "").trim().slice(0, 120);
   const company = String(b.company || "").trim().slice(0, 160);
   const email = String(b.email || "").trim().toLowerCase().slice(0, 200);
@@ -229,11 +235,16 @@ app.post("/api/auctions/:id/bids", bidLimiter, async (req, res) => {
   db.prepare("INSERT INTO bids(auction_id,name,company,email,phone,amount,token,created_at,ip) VALUES(?,?,?,?,?,?,?,?,?)")
     .run(id, name, company, email, phone, amount, token, now, req.ip);
   const link = PUBLIC_BASE_URL + "/api/verify?token=" + token;
-  await sendMail(email, "Confirm your bid on " + c.title,
+  const sent = await sendMail(email, "Confirm your bid on " + c.title,
     "Hello " + name + ",\n\nYou entered a bid of " + money(amount) + " on " + c.title + ".\n\n" +
     "Your bid does not count until you confirm it. Click this link within 24 hours:\n" + link + "\n\n" +
     "By confirming, you agree that your bid is binding on you. If you win, you are expected to open and fund an Escrow.com transaction within 7 days of the auction closing. Until escrow is funded, the owner may remove any bid or cancel the auction; once escrow is funded, the sale is final under the Escrow.com terms.\n\n" +
     "If you did not place this bid, ignore this email and nothing will happen.\n");
+  if (!sent) {
+    db.prepare("DELETE FROM bids WHERE token=?").run(token);
+    audit(id, "bid not recorded", "confirmation email could not be sent to " + email);
+    return res.status(502).json({ error: "We could not send your confirmation email, so your bid was not recorded. Please check the address and try again in a few minutes." });
+  }
   res.json({ ok: true, message: "Check your email and click the confirmation link. Your bid counts once you confirm it." });
 });
 
